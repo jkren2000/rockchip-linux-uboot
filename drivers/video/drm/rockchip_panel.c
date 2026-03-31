@@ -64,6 +64,7 @@ struct rockchip_panel_priv {
 	bool prepared;
 	bool enabled;
 	struct udevice *power_supply;
+	struct udevice *avdd_supply;
 	struct udevice *backlight;
 	struct spi_slave *spi_slave;
 	struct gpio_desc enable_gpio;
@@ -305,6 +306,9 @@ static void panel_simple_prepare(struct rockchip_panel *panel)
 	if (priv->power_supply)
 		regulator_set_enable(priv->power_supply, !plat->power_invert);
 
+	if (priv->avdd_supply)
+		regulator_set_enable(priv->avdd_supply, !plat->power_invert);
+
 	if (dm_gpio_is_valid(&priv->enable_gpio))
 		dm_gpio_set_value(&priv->enable_gpio, 1);
 
@@ -370,6 +374,9 @@ static void panel_simple_unprepare(struct rockchip_panel *panel)
 
 	if (priv->power_supply)
 		regulator_set_enable(priv->power_supply, plat->power_invert);
+
+	if (priv->avdd_supply)
+		regulator_set_enable(priv->avdd_supply, plat->power_invert);
 
 	if (plat->delay.unprepare)
 		mdelay(plat->delay.unprepare);
@@ -510,6 +517,13 @@ static int rockchip_panel_probe(struct udevice *dev)
 		printf("%s: Cannot get power supply: %d\n", __func__, ret);
 		return ret;
 	}
+
+    ret = uclass_get_device_by_phandle(UCLASS_REGULATOR, dev,
+                       "avdd-supply", &priv->avdd_supply);
+    if (ret && ret != -ENOENT) {
+        printf("Failed to get avdd regulator: %d\n", ret);
+        return ret;
+    }
 
 	ret = dev_read_string_index(dev, "rockchip,cmd-type", 0, &cmd_type);
 	if (ret)
